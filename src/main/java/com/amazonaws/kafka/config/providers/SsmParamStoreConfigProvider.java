@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import com.amazonaws.kafka.config.providers.common.AwsServiceConfigProvider;
 
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.ssm.SsmClient;
 import software.amazon.awssdk.services.ssm.SsmClientBuilder;
 import software.amazon.awssdk.services.ssm.model.GetParameterRequest;
@@ -144,7 +145,7 @@ public class SsmParamStoreConfigProvider extends AwsServiceConfigProvider {
 	}
 
     protected SsmClient checkOrInitSsmClient() {
-        return cBuilder.build();
+        return cBuilder.httpClient(ApacheHttpClient.builder().build()).build();
     }
 	
 	@Override
