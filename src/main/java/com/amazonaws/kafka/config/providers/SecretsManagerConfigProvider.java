@@ -34,6 +34,7 @@ import com.amazonaws.kafka.config.providers.common.AwsServiceConfigProvider;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClientBuilder;
 import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
@@ -172,7 +173,7 @@ public class SecretsManagerConfigProvider extends AwsServiceConfigProvider {
     }
 
     protected SecretsManagerClient checkOrInitSecretManagerClient() {
-        return cBuilder.build();
+        return cBuilder.httpClient(ApacheHttpClient.builder().build()).build();
     }
 
     @Override

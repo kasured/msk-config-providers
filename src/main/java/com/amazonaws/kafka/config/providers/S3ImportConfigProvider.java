@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import com.amazonaws.kafka.config.providers.common.AwsServiceConfigProvider;
 
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
@@ -72,6 +73,7 @@ public class S3ImportConfigProvider extends AwsServiceConfigProvider {
 
     private String localDir;
 
+    private boolean shouldOverwriteExistingFiles;
 
     @Override
     public void configure(Map<String, ?> configs) {
@@ -83,6 +85,9 @@ public class S3ImportConfigProvider extends AwsServiceConfigProvider {
             // if not defined, use temp dir defined in OS
             this.localDir = System.getProperty("java.io.tmpdir");
         }
+
+        this.shouldOverwriteExistingFiles = this.config.getBoolean(S3ImportConfig.SHOULD_OVERWRITE_EXISTING_FILE);
+        log.info("[configure] Property {} is {}", S3ImportConfig.SHOULD_OVERWRITE_EXISTING_FILE, this.shouldOverwriteExistingFiles);
     }
 
     /**
@@ -114,24 +119,41 @@ public class S3ImportConfigProvider extends AwsServiceConfigProvider {
         S3Client s3 = checkOrInitS3Client(path);
 
         for (String key: keys) {
+            log.info("[get] Processing the key {}", key);
             try {
                 Path pKey = Path.of(key);
                 Path destination = getDestination(this.localDir, pKey);
                 log.debug("Local destination for file: {}", destination);
+                log.info("[get] Property {} is {}", S3ImportConfig.SHOULD_OVERWRITE_EXISTING_FILE, shouldOverwriteExistingFiles);
                 
                 if (Files.exists(destination)) {
-                    // Imported file may already exist on a file system. If tasks are restarting, 
-                    // or more than one task is running on a worker, they may use the same file
-                    log.info("File already imported at destination: {}", destination);
-                    data.put(key, destination.toString());
-                    continue;
+                    log.info("File already exists at destination: {}", destination);
+                    if(!shouldOverwriteExistingFiles) {
+                        // Imported file may already exist on a file system. If tasks are restarting,
+                        // or more than one task is running on a worker, they may use the same file
+                        log.info("File already imported at destination: {}", destination);
+                        data.put(key, destination.toString());
+                        continue;
+                    } else {
+                        log.info("Trying to delete the file as it already exists: {}", destination);
+                        try {
+                            log.info("Deleting the file: {}", destination);
+                            Files.deleteIfExists(destination);
+                            log.info("Deleted the file: {}", destination);
+                        } catch (IOException e) {
+                            log.warn("Failed to delete the file: {}. Preserving the current logic", destination, e);
+                            data.put(key, destination.toString());
+                            continue;
+                        }
+                    }
                 }
+                log.info("Making a call to copy the file: {}", destination);
                 GetObjectRequest s3GetObjectRequest = GetObjectRequest.builder()
                         .bucket(getBucket(pKey))
                         .key(getS3ObjectKey(pKey))
                         .build();
                 s3.getObject(s3GetObjectRequest, destination);
-                log.debug("Successfully imported a file from S3 bucket: s3://{}", key);
+                log.info("Successfully imported a file from S3 bucket: s3://{}", key);
                 data.put(key, destination.toString());
             } catch(NoSuchKeyException nske) {
                 // Simply throw an exception to indicate there are issues with the objects on S3
@@ -166,7 +188,7 @@ public class S3ImportConfigProvider extends AwsServiceConfigProvider {
     }
     
     protected S3Client checkOrInitS3Client(String regionStr) {
-        S3ClientBuilder s3cb = S3Client.builder();
+        S3ClientBuilder s3cb = S3Client.builder().httpClient(ApacheHttpClient.builder().build());
 
         setClientCommonConfig(s3cb);
         

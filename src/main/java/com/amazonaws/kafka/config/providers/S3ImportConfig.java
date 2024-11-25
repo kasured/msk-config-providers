@@ -30,6 +30,12 @@ public class S3ImportConfig extends AbstractConfig{
             "Local directory to store imported from S3 files. " + 
             "If not provided, temporary directory defined in OS will be used.)";
 
+    public static final String SHOULD_OVERWRITE_EXISTING_FILE = "should_overwrite_existing";
+    private static final String SHOULD_OVERWRITE_EXISTING_FILE_DOC =
+            "Whether to overwrite a file which was already imported from S3. " +
+                    "If not provided or 'false' and the file already exists, it will not be copied over." +
+                    "If the files exists and the value is 'true', it will be copied and overwritten)";
+
     public S3ImportConfig(Map<?, ?> originals) {
         super(config(), originals);
     }
@@ -43,6 +49,13 @@ public class S3ImportConfig extends AbstractConfig{
                         ConfigDef.Importance.HIGH,
                         LOCAL_DIR_DOC
                         )
+                .define(
+                        SHOULD_OVERWRITE_EXISTING_FILE,
+                        ConfigDef.Type.BOOLEAN,
+                        false,
+                        ConfigDef.Importance.MEDIUM,
+                        SHOULD_OVERWRITE_EXISTING_FILE_DOC
+                )
                 ;
     }
 }
